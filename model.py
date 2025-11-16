@@ -131,14 +131,14 @@ def validation_fn(text_ve, translator_model, val_loader, criterion_triplet, crit
             
     return val_loss / len(val_loader)
 
-def train_fn(CONFIG, g):
+def train_fn(CONFIG, g, train_data_path):
     (
         all_text_embeddings,
         all_image_embeddings,
         num_captions_per_image,
         kfold,
         image_indices
-    ) = load_training_data(CONFIG)
+    ) = load_training_data(CONFIG, train_data_path)
     
     all_fold_mrr = []
     

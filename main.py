@@ -29,14 +29,17 @@ CONFIG = {
     "ACCUMULATION_STEPS": 2
 }
 
+TRAIN_DATA_PATH = "/kaggle/input/train.npz"
+TEST_DATA_PATH = "/kaggle/input/test.clean.npz"
+
 def main():
     seed_everything(SEED)
     g = torch.Generator()
     g.manual_seed(SEED)
     print(f"All seeds set to {SEED} and CUDNN is in deterministic mode.")
     
-    all_text_embeddings, all_image_embeddings = train_fn(SEED, CONFIG, g)
-    generate_submission(CONFIG, all_text_embeddings, all_image_embeddings)
+    all_text_embeddings, all_image_embeddings = train_fn(CONFIG, g, TRAIN_DATA_PATH)
+    generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, TEST_DATA_PATH)
 
 if __name__ == "__main__":
     main()

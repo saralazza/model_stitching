@@ -30,9 +30,9 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
-def load_training_data(CONFIG):
+def load_training_data(CONFIG, train_data_path):
     try:
-        full_train_data = np.load("/kaggle/input/train.npz", allow_pickle=True)
+        full_train_data = np.load(train_data_path, allow_pickle=True)
         all_text_embeddings = torch.from_numpy(full_train_data['captions/embeddings']).float()
         all_image_embeddings = torch.from_numpy(full_train_data['images/embeddings']).float()
 
@@ -47,7 +47,7 @@ def load_training_data(CONFIG):
 
         return all_text_embeddings, all_image_embeddings, num_captions_per_image, kfold, image_indices
     except FileNotFoundError:
-        print("Please make sure the 'train.npz' file is in the correct directory.")
+        print("Please make sure the training data file is in the correct directory.")
         raise
 
 def calculate_mrr(text_ve, translator_model, val_loader, device):
@@ -82,17 +82,17 @@ def mixup_data(x, y, alpha=0.2):
     mixed_y = lam * y + (1 - lam) * y[indices, :]
     return mixed_x, mixed_y
 
-def generate_submission(CONFIG, all_text_embeddings, all_image_embeddings):
+def generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, test_data_path):
     print("--- Generating submission.csv") 
     
     try:
-        test_data = np.load("/kaggle/input/test.clean.npz", allow_pickle=True)
+        test_data = np.load(test_data_path, allow_pickle=True)
         test_text_emb = torch.from_numpy(test_data['captions/embeddings']).float()
         test_caption_ids = test_data['captions/ids']
         test_loader = DataLoader(test_text_emb, batch_size=CONFIG['BATCH_SIZE'])
         print(f"Test data and caption IDs loaded: {len(test_caption_ids)} samples.")
     except FileNotFoundError:
-        print("ERROR: Please make sure the 'test.clean.npz' file is in the correct directory.")
+        print("ERROR: Please make sure the test data file is in the correct directory.")
         return
     
     all_predictions_list = []
