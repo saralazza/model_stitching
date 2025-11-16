@@ -7,8 +7,8 @@ from submission import generate_submission
 SEED = 42
 
 CONFIG = {
-    "TEXT_VE_PATH_TPL": "best_text_ve_fold_{}.pth",
-    "TRANSLATOR_PATH_TPL": "best_translator_mlp_fold_{}.pth",
+    "TEXT_VE_PATH_TPL": "models_mlpvae/best_text_ve_fold_{}.pth",
+    "TRANSLATOR_PATH_TPL": "models_mlpvae/best_translator_mlp_fold_{}.pth",
     "DEVICE": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "EPOCHS": 150,
     "PATIENCE": 30,
@@ -31,7 +31,7 @@ CONFIG = {
 
 TRAIN_DATA_PATH = "/kaggle/input/train.npz"
 TEST_DATA_PATH = "/kaggle/input/test.clean.npz"
-SUBMISSION_PATH = "submission.csv"
+SUBMISSION_PATH = "submission_mlpvae.csv"
 
 def main():
     seed_everything(SEED)
