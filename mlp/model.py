@@ -32,6 +32,7 @@ class ResidualBlockGeGLU(nn.Module):
         return x + self.block(x)
 
 class TranslatorMLP(nn.Module):
+    """Pure MLP translator that use clean dataset."""
     def __init__(self, in_features, out_features, hidden_features, num_blocks, dropout_rate):
         super().__init__()
         
@@ -59,6 +60,7 @@ class TranslatorMLP(nn.Module):
         return F.normalize(output, p=2, dim=1)
 
 class PureContrastiveLoss(nn.Module):
+    """Contrastive classification loss with label smoothing tuned for the clean set."""
     def __init__(self, temperature=0.07, label_smoothing=0.12):
         super().__init__()
         self.temperature = temperature
@@ -69,6 +71,7 @@ class PureContrastiveLoss(nn.Module):
         return F.cross_entropy(sim_matrix, labels, label_smoothing=self.label_smoothing)
 
 class TripletLoss(nn.Module):
+    """Hard-negative triplet loss used by CLIP but that lead to nothing good."""
     def __init__(self, margin=0.2):
         super().__init__()
         self.margin = margin
@@ -81,6 +84,7 @@ class TripletLoss(nn.Module):
         return F.relu(self.margin - positive_scores + hard_negative_scores).mean()
 
 def validation_fn(translator_model, val_loader, criterion_triplet, criterion_pure, alpha, device):
+    """Calculates the hybrid loss on the validation split for early stopping."""
     translator_model.eval()
     val_loss = 0
     with torch.no_grad():
@@ -99,6 +103,10 @@ def validation_fn(translator_model, val_loader, criterion_triplet, criterion_pur
     return val_loss / len(val_loader)
 
 def train_fn(CONFIG, g, train_data_path, clean_caption_indices_path):
+    """
+    Trains the MLP-only translator on the cleaned dataset with K-fold CV.
+    Reuses MixUp + hybrid loss, saves best checkpoints per fold, and reports MRR.
+    """
     (
         all_text_embeddings,
         all_image_embeddings,

@@ -59,6 +59,13 @@ CLEAN_CAPTION_INDICES_PATH = "/kaggle/input/clean-dataset/clean_caption_indices.
 TEST_DATA_PATH = "/kaggle/input/test.clean.npz"
 
 def main():
+    """
+    Entry point coordinating both training pipelines plus their submissions/ensemble.
+    1) Seeds everything for reproducibility.
+    2) Trains the MLP-VAE stack, generates its submission.
+    3) Trains the cleaned MLP-only stack, generates its submission.
+    4) Ensembles the two CSVs into the final submission.
+    """
     seed_everything(SEED)
     g = torch.Generator()
     g.manual_seed(SEED)

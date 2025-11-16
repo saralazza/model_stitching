@@ -9,6 +9,10 @@ from .mlp_vae.model import TextVariationalEncoder, TranslatorMLP as TranslatorML
 from .mlp.model import TranslatorMLP as TranslatorMLPOnly
 
 def generate_submission_mlp_vae(CONFIG, all_text_embeddings, all_image_embeddings, test_data_path):
+    """
+    Loads each fold’s VAE+translator checkpoints, predicts test embeddings,
+    averages fold outputs, and writes the VAE submission CSV.
+    """
     print(f"--- Generating {CONFIG['SUBMISSION_PATH']}") 
     
     try:
@@ -86,6 +90,10 @@ def generate_submission_mlp_vae(CONFIG, all_text_embeddings, all_image_embedding
         print(submission_df.head())
 
 def generate_submission_mlp(CONFIG, all_text_embeddings, all_image_embeddings, test_data_path, submission_path="submission.csv"):
+    """
+    Uses the MLP-only checkpoints to embed test captions directly, averages folds,
+    and writes the cleaned-data submission CSV.
+    """
     print("--- Generating submission.csv using K-Fold MLP models (Averaging) ---")
     
     try:
@@ -152,6 +160,10 @@ def generate_submission_mlp(CONFIG, all_text_embeddings, all_image_embeddings, t
         print(submission_df.head())
 
 def generate_final_submission(csv_path_mlp, csv_path_vae_mlp, output_path, weight_mlp=0.65, weight_vae_mlp=0.35):
+    """
+    Performs the final weighted ensemble between the two submission files,
+    mirroring the notebook ensembling cell.
+    """
     df_mlp = pd.read_csv(csv_path_mlp)
     df_vae_mlp = pd.read_csv(csv_path_vae_mlp)
 

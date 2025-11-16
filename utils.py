@@ -29,6 +29,10 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 def load_training_data(CONFIG, train_data_path):
+    """
+    Loads the raw Kaggle embeddings once, returning tensors plus a KFold splitter
+    that keeps all captions of an image together to prevent data leakage.
+    """
     try:
         full_train_data = np.load(train_data_path, allow_pickle=True)
         all_text_embeddings = torch.from_numpy(full_train_data['captions/embeddings']).float()
@@ -49,6 +53,7 @@ def load_training_data(CONFIG, train_data_path):
         raise
 
 def calculate_mrr_mlp_vae(text_ve, translator_model, val_loader, device):
+    """Computes MRR when predictions come from the VAE->MLP pipeline."""
     text_ve.eval()
     translator_model.eval()
     all_reciprocal_ranks = []
@@ -72,6 +77,7 @@ def calculate_mrr_mlp_vae(text_ve, translator_model, val_loader, device):
     return mrr
 
 def calculate_mrr_mlp(translator_model, val_loader, device):
+    """Computes MRR for the direct MLP translator (no VAE)."""
     translator_model.eval()
     all_reciprocal_ranks = []
     with torch.no_grad():
@@ -92,6 +98,7 @@ def calculate_mrr_mlp(translator_model, val_loader, device):
     return mrr
 
 def mixup_data(x, y, alpha=0.2):
+    """Applies MixUp augmentation to both modality tensors to regularize training."""
     if alpha > 0: lam = np.random.beta(alpha, alpha)
     else: lam = 1
     batch_size = x.size(0)
@@ -101,6 +108,10 @@ def mixup_data(x, y, alpha=0.2):
     return mixed_x, mixed_y
 
 def load_data_cleaned(train_data_path, clean_caption_indices_path, n_folds, random_state):
+    """
+    Rebuilds a clean 1:1 text/image dataset by filtering the noisy embeddings with
+    precomputed caption indices, then prepares indices for cross-validation.
+    """
     try:
         full_train_data = np.load(train_data_path, allow_pickle=True)
         all_text_embeddings_full = torch.from_numpy(full_train_data['captions/embeddings']).float()

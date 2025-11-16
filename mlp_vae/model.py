@@ -37,6 +37,7 @@ class ResidualBlockGeGLU(nn.Module):
         return x + self.block(x)
 
 class TextVariationalEncoder(nn.Module):
+    """Encodes caption embeddings into a latent Gaussian that feeds the translator."""
     def __init__(self, in_features, hidden_features, latent_dim):
         super().__init__()
         self.encoder = nn.Sequential(
@@ -60,6 +61,7 @@ class TextVariationalEncoder(nn.Module):
         return z, mu, log_var
 
 class TranslatorMLP(nn.Module):
+    """Maps latent vectors into normalized image-embedding predictions."""
     def __init__(self, in_features, out_features, hidden_features, num_blocks, dropout_rate):
         super().__init__()
         
@@ -87,6 +89,7 @@ class TranslatorMLP(nn.Module):
         return F.normalize(output, p=2, dim=1)
 
 class PureContrastiveLoss(nn.Module):
+    """InfoNCE-style term aligning predicted and target embeddings."""
     def __init__(self, temperature=0.07):
         super().__init__()
         self.temperature = temperature
@@ -96,6 +99,7 @@ class PureContrastiveLoss(nn.Module):
         return F.cross_entropy(sim_matrix, labels)
 
 class TripletLoss(nn.Module):
+    """Hard-negative triplet loss encouraging correct pairs to outrank others."""
     def __init__(self, margin=0.2):
         super().__init__()
         self.margin = margin
@@ -108,6 +112,7 @@ class TripletLoss(nn.Module):
         return F.relu(self.margin - positive_scores + hard_negative_scores).mean()
 
 def validation_fn(text_ve, translator_model, val_loader, criterion_triplet, criterion_pure, alpha, kld_weight, device):
+    """Evaluates the hybrid loss (contrastive + triplet + KLD) on the validation loader."""
     text_ve.eval()
     translator_model.eval()
     val_loss = 0
@@ -133,6 +138,11 @@ def validation_fn(text_ve, translator_model, val_loader, criterion_triplet, crit
     return val_loss / len(val_loader)
 
 def train_fn(CONFIG, g, train_data_path):
+    """
+    Full K-fold training loop for the VAE + translator stack.
+    Handles data partitioning, MixUp, hybrid loss computation, checkpointing, and logs.
+    Returns the full embedding tensors for downstream submission generation.
+    """
     (
         all_text_embeddings,
         all_image_embeddings,
