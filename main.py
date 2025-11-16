@@ -9,6 +9,7 @@ SEED = 42
 CONFIG = {
     "TEXT_VE_PATH_TPL": "best_text_ve_fold_{}.pth",
     "TRANSLATOR_PATH_TPL": "best_translator_mlp_fold_{}.pth",
+    "SUBMISSION_PATH": "submission_mlpvae.csv",
     "DEVICE": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     "EPOCHS": 150,
     "PATIENCE": 30,
@@ -40,7 +41,13 @@ def main():
     print(f"All seeds set to {SEED} and CUDNN is in deterministic mode.")
     
     all_text_embeddings, all_image_embeddings = train_fn(CONFIG, g, TRAIN_DATA_PATH)
-    generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, TEST_DATA_PATH, SUBMISSION_PATH)
+    generate_submission(
+        CONFIG,
+        all_text_embeddings,
+        all_image_embeddings,
+        TEST_DATA_PATH,
+        submission_path=SUBMISSION_PATH
+    )
 
 if __name__ == "__main__":
     main()
