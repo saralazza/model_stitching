@@ -9,7 +9,7 @@ from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from model import TextVariationalEncoder, TranslatorMLP
+from .model import TextVariationalEncoder, TranslatorMLP
 
 def seed_everything(seed):
     random.seed(seed)

@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from utils import (
+from .utils import (
         seed_worker,
         load_training_data,
         calculate_mrr,
