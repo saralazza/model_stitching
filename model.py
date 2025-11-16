@@ -250,11 +250,6 @@ def train_fn(CONFIG, g, train_data_path):
                 
                 text_ve_path = CONFIG['TEXT_VE_PATH_TPL'].format(fold)
                 translator_path = CONFIG['TRANSLATOR_PATH_TPL'].format(fold)
-
-                for path in (text_ve_path, translator_path):
-                    path_dir = os.path.dirname(path)
-                    if path_dir:
-                        os.makedirs(path_dir, exist_ok=True)
                 
                 torch.save(text_ve.state_dict(), text_ve_path)
                 torch.save(translator_model.state_dict(), translator_path)
