@@ -145,8 +145,8 @@ def generate_submission_mlp(CONFIG, all_text_embeddings, all_image_embeddings, t
             'embedding': embedding_json_list
         })
     
-        submission_df.to_csv(submission_path, index=False)
+        submission_df.to_csv(CONFIG['SUBMISSION_PATH'], index=False)
     
-        print(f"\n✅ Ensembled submission file '{submission_path}' has been generated successfully!")
+        print(f"\n✅ Ensembled submission file '{CONFIG['SUBMISSION_PATH']}' has been generated successfully!")
         print("Here's a preview of the first 5 rows:")
         print(submission_df.head())
