@@ -1,19 +1,14 @@
+import os
+import itertools
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import itertools
-import numpy as np
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
-import os
 
-from ..utils import (
-        seed_worker,
-        load_training_data,
-        calculate_mrr_mlp_vae,
-        mixup_data
-)
+from ..utils import calculate_mrr_mlp, seed_worker, mixup_data, load_data_cleaned
 
 class GeGLU(nn.Module):
     def __init__(self, in_features, out_features):
@@ -35,29 +30,6 @@ class ResidualBlockGeGLU(nn.Module):
         )
     def forward(self, x):
         return x + self.block(x)
-
-class TextVariationalEncoder(nn.Module):
-    def __init__(self, in_features, hidden_features, latent_dim):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(in_features, hidden_features),
-            nn.GELU(),
-            nn.LayerNorm(hidden_features)
-        )
-        self.fc_mu = nn.Linear(hidden_features, latent_dim)
-        self.fc_log_var = nn.Linear(hidden_features, latent_dim)
-
-    def reparameterize(self, mu, log_var):
-        std = torch.exp(0.5 * log_var)
-        epsilon = torch.randn_like(std)
-        return mu + epsilon * std
-
-    def forward(self, x):
-        h = self.encoder(x)
-        mu = self.fc_mu(h)
-        log_var = self.fc_log_var(h)
-        z = self.reparameterize(mu, log_var)
-        return z, mu, log_var
 
 class TranslatorMLP(nn.Module):
     def __init__(self, in_features, out_features, hidden_features, num_blocks, dropout_rate):
@@ -87,13 +59,14 @@ class TranslatorMLP(nn.Module):
         return F.normalize(output, p=2, dim=1)
 
 class PureContrastiveLoss(nn.Module):
-    def __init__(self, temperature=0.07):
+    def __init__(self, temperature=0.07, label_smoothing=0.12):
         super().__init__()
         self.temperature = temperature
+        self.label_smoothing = label_smoothing
     def forward(self, pred_norm, target_norm):
         sim_matrix = torch.matmul(pred_norm, target_norm.T) / self.temperature
         labels = torch.arange(pred_norm.size(0), device=pred_norm.device)
-        return F.cross_entropy(sim_matrix, labels)
+        return F.cross_entropy(sim_matrix, labels, label_smoothing=self.label_smoothing)
 
 class TripletLoss(nn.Module):
     def __init__(self, margin=0.2):
@@ -107,62 +80,52 @@ class TripletLoss(nn.Module):
         hard_negative_scores = sim_matrix_masked.max(dim=1)[0]
         return F.relu(self.margin - positive_scores + hard_negative_scores).mean()
 
-def validation_fn(text_ve, translator_model, val_loader, criterion_triplet, criterion_pure, alpha, kld_weight, device):
-    text_ve.eval()
+def validation_fn(translator_model, val_loader, criterion_triplet, criterion_pure, alpha, device):
     translator_model.eval()
     val_loss = 0
     with torch.no_grad():
         for text_batch, image_batch in val_loader:
             text_batch, image_batch = text_batch.to(device), image_batch.to(device)
             
-            z, mu, log_var = text_ve(text_batch)
-            pred_embeddings = translator_model(z)
-            
+            pred_embeddings = translator_model(text_batch)
             target_embeddings = F.normalize(image_batch, p=2, dim=1)
             
             loss_triplet = criterion_triplet(pred_embeddings, target_embeddings)
             loss_pure = criterion_pure(pred_embeddings, target_embeddings)
             hybrid_loss = (alpha * loss_triplet) + ((1 - alpha) * loss_pure)
             
-            kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-            kld_loss = kld_loss / text_batch.size(0)
-            
-            loss = hybrid_loss + (kld_weight * kld_loss)
-            val_loss += loss.item()
+            val_loss += hybrid_loss.item()
             
     return val_loss / len(val_loader)
 
-def train_fn(CONFIG, g, train_data_path):
+def train_fn(CONFIG, g, train_data_path, clean_caption_indices_path):
     (
         all_text_embeddings,
         all_image_embeddings,
-        num_captions_per_image,
-        kfold,
-        image_indices
-    ) = load_training_data(CONFIG, train_data_path)
+        pair_indices,
+        kfold
+    ) = load_data_cleaned(
+        train_data_path,
+        clean_caption_indices_path,
+        CONFIG['N_FOLDS'],
+        CONFIG['RANDOM_STATE']
+    )
     
     all_fold_mrr = []
     
-    for fold, (train_image_indices, val_image_indices) in enumerate(kfold.split(image_indices)):
+    for fold, (train_pair_indices, val_pair_indices) in enumerate(kfold.split(pair_indices)):
         print(f"\n{'='*50}")
         print(f"--- STARTING FOLD {fold+1}/{CONFIG['N_FOLDS']} ---")
         print(f"{'='*50}")
     
-        train_image_emb = all_image_embeddings[train_image_indices]
-        val_image_emb = all_image_embeddings[val_image_indices]
-    
-        train_image_emb_expanded = train_image_emb.repeat_interleave(num_captions_per_image, dim=0)
-    
-        train_caption_indices = [i for idx in train_image_indices for i in range(idx * num_captions_per_image, (idx + 1) * num_captions_per_image)]
-        val_caption_indices = [i for idx in val_image_indices for i in range(idx * num_captions_per_image, (idx + 1) * num_captions_per_image)]
-    
-        train_text_emb = all_text_embeddings[train_caption_indices]
-        val_text_emb = all_text_embeddings[val_caption_indices]
+        train_text_emb = all_text_embeddings[train_pair_indices]
+        train_image_emb = all_image_embeddings[train_pair_indices]
         
-        val_text_emb_one_per_image = val_text_emb[::num_captions_per_image]
+        val_text_emb = all_text_embeddings[val_pair_indices]
+        val_image_emb = all_image_embeddings[val_pair_indices]
     
-        train_dataset = TensorDataset(train_text_emb, train_image_emb_expanded)
-        val_dataset = TensorDataset(val_text_emb_one_per_image, val_image_emb)
+        train_dataset = TensorDataset(train_text_emb, train_image_emb)
+        val_dataset = TensorDataset(val_text_emb, val_image_emb)
     
         train_loader = DataLoader(
             train_dataset, 
@@ -175,36 +138,33 @@ def train_fn(CONFIG, g, train_data_path):
     
         print(f"Fold {fold+1}: Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
     
-        text_ve = TextVariationalEncoder(
-            in_features=all_text_embeddings.shape[1],
-            hidden_features=CONFIG['LATENT_DIM'],
-            latent_dim=CONFIG['LATENT_DIM']
-        ).to(CONFIG['DEVICE'])
-    
         translator_model = TranslatorMLP(
-            in_features=CONFIG['LATENT_DIM'],
-            out_features=all_image_embeddings.shape[1],
+            in_features=all_text_embeddings.shape[1], 
+            out_features=all_image_embeddings.shape[1], 
             hidden_features=CONFIG['HIDDEN_FEATURES'],
             num_blocks=CONFIG['NUM_BLOCKS'],
             dropout_rate=CONFIG['DROPOUT_RATE']
         ).to(CONFIG['DEVICE'])
     
         criterion_triplet = TripletLoss(margin=CONFIG['MARGIN'])
-        criterion_pure = PureContrastiveLoss(temperature=CONFIG['TEMPERATURE'])
+        criterion_pure = PureContrastiveLoss(
+            temperature=CONFIG['TEMPERATURE'],
+            label_smoothing=CONFIG['LABEL_SMOOTHING']
+        )
     
         optimizer = optim.AdamW(
-            itertools.chain(text_ve.parameters(), translator_model.parameters()),
+            translator_model.parameters(),
             lr=CONFIG['LR'],
             weight_decay=CONFIG['WEIGHT_DECAY']
         )
-        total_steps = len(train_loader) * CONFIG['EPOCHS']
+        
+        total_steps = len(train_loader) * CONFIG['EPOCHS'] // CONFIG['ACCUMULATION_STEPS']
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=total_steps)
         
         best_finetune_mrr = -1.0
         patience_counter = 0
     
         for epoch in range(CONFIG['EPOCHS']):
-            text_ve.train()
             translator_model.train()
             total_train_loss = 0
             
@@ -217,17 +177,12 @@ def train_fn(CONFIG, g, train_data_path):
                 target_embeddings = F.normalize(image_batch, p=2, dim=1)
                 mixed_text, mixed_targets = mixup_data(text_batch, target_embeddings, alpha=CONFIG['MIXUP_ALPHA'])
     
-                z, mu, log_var = text_ve(mixed_text)
-                pred_embeddings = translator_model(z)
+                pred_embeddings = translator_model(mixed_text)
                 
                 loss_triplet = criterion_triplet(pred_embeddings, mixed_targets)
                 loss_pure = criterion_pure(pred_embeddings, mixed_targets)
-                hybrid_loss = (CONFIG['HYBRID_ALPHA'] * loss_triplet) + ((1 - CONFIG['HYBRID_ALPHA']) * loss_pure)
+                loss = (CONFIG['HYBRID_ALPHA'] * loss_triplet) + ((1 - CONFIG['HYBRID_ALPHA']) * loss_pure)
                 
-                kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
-                kld_loss = kld_loss / mixed_text.size(0)
-                
-                loss = hybrid_loss + (CONFIG['KLD_WEIGHT'] * kld_loss)
                 loss = loss / CONFIG['ACCUMULATION_STEPS']
                 loss.backward()
     
@@ -240,20 +195,25 @@ def train_fn(CONFIG, g, train_data_path):
                 batch_iterator.set_postfix({"Train Loss": f"{loss.item() * CONFIG['ACCUMULATION_STEPS']:.4f}"})
             
             avg_train_loss = total_train_loss / len(train_loader)
-            val_mrr = calculate_mrr_mlp_vae(text_ve, translator_model, val_loader, CONFIG['DEVICE'])
+            val_loss = validation_fn(
+                translator_model, 
+                val_loader, 
+                criterion_triplet, 
+                criterion_pure, 
+                CONFIG['HYBRID_ALPHA'], 
+                CONFIG['DEVICE']
+            )
+            val_mrr = calculate_mrr_mlp(translator_model, val_loader, CONFIG['DEVICE'])
             current_lr = scheduler.get_last_lr()[0]
             
-            print(f"Fold {fold+1} Epoch {epoch+1} -> Train Loss: {avg_train_loss:.4f} | Val MRR: {val_mrr:.4f} | LR: {current_lr:e}")
+            print(f"Fold {fold+1} Epoch {epoch+1} -> Train Loss: {avg_train_loss:.4f} | Val Loss: {val_loss:.4f} | Val MRR: {val_mrr:.4f} | LR: {current_lr:e}")
             
             if val_mrr > best_finetune_mrr:
                 best_finetune_mrr = val_mrr
                 
-                text_ve_path = CONFIG['TEXT_VE_PATH_TPL'].format(fold)
-                translator_path = CONFIG['TRANSLATOR_PATH_TPL'].format(fold)
-                
-                torch.save(text_ve.state_dict(), text_ve_path)
-                torch.save(translator_model.state_dict(), translator_path)
-                print(f"  🏆 New best MRR for Fold {fold+1}! Saving models to {text_ve_path}...")
+                model_path = CONFIG['MODEL_PATH_TPL'].format(fold)
+                torch.save(translator_model.state_dict(), model_path)
+                print(f"  🏆 New best MRR for Fold {fold+1}! Saving model to {model_path}...")
                 patience_counter = 0
             else:
                 patience_counter += 1
