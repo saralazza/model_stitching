@@ -2,7 +2,7 @@ import torch
 
 from mlp_vae.model import train_fn as train_fn_mlp_vae
 from mlp.model import train_fn as train_fn_mlp
-from utils import seed_everything
+from utils import seed_everything, generate_final_submission
 from submission import generate_submission_mlp_vae, generate_submission_mlp
 
 SEED = 42
@@ -85,6 +85,12 @@ def main():
         all_image_embeddings_mlp,
         TEST_DATA_PATH,
         submission_path=CONFIG_MLP["SUBMISSION_PATH"]
+    )
+
+    generate_final_submission(
+        CONFIG_MLP["SUBMISSION_PATH"],
+        CONFIG_MLP_VAE["SUBMISSION_PATH"],
+        "submission_final.csv"
     )
 
 if __name__ == "__main__":
