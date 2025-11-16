@@ -31,6 +31,7 @@ CONFIG = {
 
 TRAIN_DATA_PATH = "/kaggle/input/train.npz"
 TEST_DATA_PATH = "/kaggle/input/test.clean.npz"
+SUBMISSION_PATH = "submission.csv"
 
 def main():
     seed_everything(SEED)
@@ -39,7 +40,7 @@ def main():
     print(f"All seeds set to {SEED} and CUDNN is in deterministic mode.")
     
     all_text_embeddings, all_image_embeddings = train_fn(CONFIG, g, TRAIN_DATA_PATH)
-    generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, TEST_DATA_PATH)
+    generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, TEST_DATA_PATH, SUBMISSION_PATH)
 
 if __name__ == "__main__":
     main()
