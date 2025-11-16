@@ -1,6 +1,6 @@
 import torch
 
-from model import train_fn
+from mlp_vae.model import train_fn
 from utils import seed_everything
 from submission import generate_submission
 
@@ -45,8 +45,7 @@ def main():
         CONFIG,
         all_text_embeddings,
         all_image_embeddings,
-        TEST_DATA_PATH,
-        submission_path=SUBMISSION_PATH
+        TEST_DATA_PATH
     )
 
 if __name__ == "__main__":

@@ -5,10 +5,10 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .model import TextVariationalEncoder, TranslatorMLP
+from .mlp_vae.model import TextVariationalEncoder, TranslatorMLP
 
 def generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, test_data_path):
-    print("--- Generating submission.csv") 
+    print(f"--- Generating {CONFIG['SUBMISSION_PATH']}") 
     
     try:
         test_data = np.load(test_data_path, allow_pickle=True)

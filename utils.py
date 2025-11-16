@@ -79,5 +79,3 @@ def mixup_data(x, y, alpha=0.2):
     mixed_x = lam * x + (1 - lam) * x[indices, :]
     mixed_y = lam * y + (1 - lam) * y[indices, :]
     return mixed_x, mixed_y
-
-# generate_submission moved to submission.py to avoid circular imports

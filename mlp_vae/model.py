@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import os
 
-from .utils import (
+from ..utils import (
         seed_worker,
         load_training_data,
         calculate_mrr,
