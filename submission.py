@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from mlp_vae.model import TextVariationalEncoder, TranslatorMLP as TranslatorMLPVAE
-from mlp.model import TranslatorMLP as TranslatorMLPOnly
+from .mlp_vae.model import TextVariationalEncoder, TranslatorMLP as TranslatorMLPVAE
+from .mlp.model import TranslatorMLP as TranslatorMLPOnly
 
 def generate_submission_mlp_vae(CONFIG, all_text_embeddings, all_image_embeddings, test_data_path):
     print(f"--- Generating {CONFIG['SUBMISSION_PATH']}") 
