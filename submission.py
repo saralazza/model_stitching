@@ -150,3 +150,22 @@ def generate_submission_mlp(CONFIG, all_text_embeddings, all_image_embeddings, t
         print(f"\n✅ Ensembled submission file '{CONFIG['SUBMISSION_PATH']}' has been generated successfully!")
         print("Here's a preview of the first 5 rows:")
         print(submission_df.head())
+
+def generate_final_submission(csv_path_mlp, csv_path_vae_mlp, output_path, weight_mlp=0.65, weight_vae_mlp=0.35):
+    df_mlp = pd.read_csv(csv_path_mlp)
+    df_vae_mlp = pd.read_csv(csv_path_vae_mlp)
+
+    embs_mlp = np.array([json.loads(e) for e in df_mlp['embedding']])
+    embs_vae_mlp = np.array([json.loads(e) for e in df_vae_mlp['embedding']])
+
+    avg_embs = (weight_mlp * embs_mlp) + (weight_vae_mlp * embs_vae_mlp)
+    embedding_json_list = [json.dumps(embedding.tolist()) for embedding in avg_embs]
+
+    df_ensembled = pd.DataFrame({
+        'id': df_mlp['id'],
+        'embedding': embedding_json_list
+    })
+
+    df_ensembled.to_csv(output_path, index=False)
+    print(f"Ensembled submission created at '{output_path}'")
+    print(df_ensembled.head())

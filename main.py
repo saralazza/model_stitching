@@ -2,8 +2,8 @@ import torch
 
 from mlp_vae.model import train_fn as train_fn_mlp_vae
 from mlp.model import train_fn as train_fn_mlp
-from utils import seed_everything, generate_final_submission
-from submission import generate_submission_mlp_vae, generate_submission_mlp
+from utils import seed_everything
+from submission import generate_submission_mlp_vae, generate_submission_mlp, generate_final_submission
 
 SEED = 42
 
