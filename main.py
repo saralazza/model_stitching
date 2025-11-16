@@ -1,8 +1,8 @@
 import torch
 
 from model import train_fn
-from utils import generate_submission
 from utils import seed_everything
+from submission import generate_submission
 
 SEED = 42
 

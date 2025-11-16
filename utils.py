@@ -9,8 +9,6 @@ from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .model import TextVariationalEncoder, TranslatorMLP
-
 def seed_everything(seed):
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -82,79 +80,4 @@ def mixup_data(x, y, alpha=0.2):
     mixed_y = lam * y + (1 - lam) * y[indices, :]
     return mixed_x, mixed_y
 
-def generate_submission(CONFIG, all_text_embeddings, all_image_embeddings, test_data_path):
-    print("--- Generating submission.csv") 
-    
-    try:
-        test_data = np.load(test_data_path, allow_pickle=True)
-        test_text_emb = torch.from_numpy(test_data['captions/embeddings']).float()
-        test_caption_ids = test_data['captions/ids']
-        test_loader = DataLoader(test_text_emb, batch_size=CONFIG['BATCH_SIZE'])
-        print(f"Test data and caption IDs loaded: {len(test_caption_ids)} samples.")
-    except FileNotFoundError:
-        print("ERROR: Please make sure the test data file is in the correct directory.")
-        return
-    
-    all_predictions_list = []
-    
-    for fold in range(CONFIG['N_FOLDS']):
-        print(f"--- Generating predictions for Fold {fold+1}/{CONFIG['N_FOLDS']} ---")
-        
-        text_ve_path = CONFIG['TEXT_VE_PATH_TPL'].format(fold)
-        translator_path = CONFIG['TRANSLATOR_PATH_TPL'].format(fold)
-    
-        text_ve = TextVariationalEncoder(
-            in_features=all_text_embeddings.shape[1],
-            hidden_features=CONFIG['LATENT_DIM'],
-            latent_dim=CONFIG['LATENT_DIM']
-        ).to(CONFIG['DEVICE'])
-    
-        translator_model = TranslatorMLP(
-            in_features=CONFIG['LATENT_DIM'],
-            out_features=all_image_embeddings.shape[1], 
-            hidden_features=CONFIG['HIDDEN_FEATURES'],
-            num_blocks=CONFIG['NUM_BLOCKS'],
-            dropout_rate=CONFIG['DROPOUT_RATE']
-        ).to(CONFIG['DEVICE'])
-    
-        try:
-            text_ve.load_state_dict(torch.load(text_ve_path))
-            translator_model.load_state_dict(torch.load(translator_path))
-        except FileNotFoundError:
-            print(f"ERROR: Could not find model files for fold {fold}: {text_ve_path} or {translator_path}")
-            print("Please ensure training is complete and files are saved correctly.")
-            continue 
-        
-        text_ve.eval()
-        translator_model.eval()
-    
-        fold_predictions = []
-        with torch.no_grad():
-            for text_batch in tqdm(test_loader, desc=f"Predicting Fold {fold+1}"):
-                text_batch = text_batch.to(CONFIG['DEVICE'])
-                
-                z, _, _ = text_ve(text_batch)
-                pred_batch = translator_model(z)
-                
-                fold_predictions.append(pred_batch.cpu().numpy())
-        
-        all_predictions_list.append(np.concatenate(fold_predictions, axis=0))
-    
-    if not all_predictions_list:
-        print("\nNo predictions were generated. Cannot create submission file.")
-    else:
-        print(f"\n--- Averaging predictions from {len(all_predictions_list)} folds ---")
-        avg_predictions = np.mean(all_predictions_list, axis=0)
-        
-        embedding_json_list = [json.dumps(embedding.tolist()) for embedding in avg_predictions]
-    
-        submission_df = pd.DataFrame({
-            'id': test_caption_ids,
-            'embedding': embedding_json_list
-        })
-    
-        submission_df.to_csv("submission.csv", index=False)
-    
-        print(f"\n✅ Ensembled submission file 'submission.csv' has been generated successfully!")
-        print("Here's a preview of the first 5 rows:")
-        print(submission_df.head())
+# generate_submission moved to submission.py to avoid circular imports
